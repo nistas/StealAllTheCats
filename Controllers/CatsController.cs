@@ -1,4 +1,5 @@
-﻿using Azure.Core;
+﻿using Azure;
+using Azure.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -44,14 +45,13 @@ namespace StealAllTheCats.Controllers
         [HttpGet]
         public async Task<ActionResult<List<Cat>>> GetAllCats()
         {
-            var miaou =  _context.Cats.ToList();
-            if (miaou is null)
+            var cats = GetAllCatsFromDb();
+
+            if (cats is null)
             {
                 return Ok("No Cats Found in the Database. Please try to the Fetch endpoint to fill some.");
             }
-
-
-            return Ok(miaou);
+            return Ok(cats);
         }
 
         [HttpGet]
@@ -64,35 +64,39 @@ namespace StealAllTheCats.Controllers
                 return Ok("No Tags Found in the Database. Please try to the Fetch new Cats and maybe some of them are available.");
             }
 
-
             return Ok(miaou);
         }
-
 
         [HttpGet("{id:int}")]
         public async Task<ActionResult<List<Cat>>> GetSpecificCat([FromRoute]int id)
         {
-            var miaou = await _context.Cats.FindAsync(id);
-            if(miaou is null)
+            var thisCat = await _context.Cats.FindAsync(id);
+            if (thisCat is null)
+            {
                 return NotFound("Cat with Id:" + id + " not found. Make sure that there are stored Cats in the Database first, and then try another Id."); // status 404
+            }
+            else {
+                var cattag = _context.CatTag.ToList();
+                var tags = _context.Tags.ToList();
 
+                    var relationFound = (from p in cattag
+                                         where p.CatId == thisCat.Id
+                                         select p).ToList();
 
+                    foreach (var rel in relationFound)
+                    {
+                        var names = (from p in tags
+                                     where p.Id == rel.TagId
+                                     select p.Name).ToList();
 
-
-            //var mycats = (from c in _context.Cats
-            //              join t in _context.Tags
-            //              on c.Id == ct1.Ca
-            //                        join t in _context.Tags
-            //                        on t
-            //                        equals albumList.ArtistId
-            //              select new
-            //              {
-            //                  Album = albumList,
-            //                  Artist = artistList
-            //              })
-            //           .ToList();
-
-            return Ok(miaou);
+                        foreach (var text in names)
+                        {
+                            thisCat.Tags.Add(text);
+                        }
+                    }
+                
+            }
+            return Ok(thisCat);
         }
 
         [HttpGet]
@@ -105,14 +109,8 @@ namespace StealAllTheCats.Controllers
                 return BadRequest("Page and/or pageSize parameters must be greater than zero");
             }
 
+            var miaou = PaginationRules(GetAllCatsFromDb(), page, pageSize);
 
-            int SkipRecs = 0;
-            if (page > 1)
-            {
-                SkipRecs = (page * pageSize)- pageSize;
-            }
-            
-            var miaou = _context.Cats.Skip(SkipRecs).Take(pageSize);
             if (miaou is null || miaou.Count()==0)
             {
                 return Ok("No Cats Found in the Database. Please try to the Fetch endpoint to fill some.");
@@ -132,17 +130,54 @@ namespace StealAllTheCats.Controllers
             }
 
 
-            int SkipRecs = 0;
-            if (page > 1)
+            var availableTags = _context.Tags.ToList();
+            var TagFound = (from p in availableTags
+                            where p.Name.ToLower() == tag.ToLower()
+                            select p).FirstOrDefault();
+
+            if (TagFound !=null)
             {
-                SkipRecs = (page * pageSize) - pageSize;
+                
+                var cattag = _context.CatTag.ToList();
+                int TagId = TagFound.Id;
+
+                //Find all the CatIds having the Tag
+                var catIds = (from p in cattag
+                              where p.TagId == TagId
+                              select p.CatId).ToList();
+
+                List<Cat> finalCats = new List<Cat>();
+                foreach (var catId in catIds)
+                {
+                    var foundCats = (from p in _context.Cats
+                                where p.Id == catId
+                               select p).ToList();
+                    foreach (var thisCat in foundCats)
+                    {
+                        finalCats.Add(thisCat);
+                    }
+                  
+                }
+
+  
+                var miaou = PaginationRules(finalCats,page, pageSize);
+
+
+
+
+                if (miaou is null || miaou.Count() == 0)
+                {
+                    return Ok("No Cats Found in the Database. Please try to the Fetch endpoint to fill some.");
+                }
+                else {
+                    return Ok(miaou);
+                }
             }
-            var miaou = _context.Cats.Skip(SkipRecs).Take(pageSize);
-            if (miaou is null || miaou.Count() == 0)
+            else
             {
-                return Ok("No Cats Found in the Database. Please try to the Fetch endpoint to fill some.");
+                return Ok("The Tag does not exist. Please try the available endpoint to see all tags");
             }
-            return Ok(miaou);
+            
         }
 
         [HttpPost]
@@ -152,7 +187,7 @@ namespace StealAllTheCats.Controllers
             try
             {
                 int NumOCatsToRequest = 25;
-                dynamic newCats = FetchFromTheCatsApi(25);
+                dynamic newCats = FetchFromTheCaaSAPIAndStore(25);
                 if (newCats.ApiMessage.ToString().ToLower() != "#ok#")
                 {
                     return Ok(newCats.ApiMessage);
@@ -198,7 +233,7 @@ namespace StealAllTheCats.Controllers
                     return Ok("Please define the number of cats you want to fetch. Min: 1");
                 }
                 
-                    dynamic newCats = FetchFromTheCatsApi(NumOfCats);
+                    dynamic newCats = FetchFromTheCaaSAPIAndStore(NumOfCats);
                     if (newCats.ApiMessage.ToString().ToLower() != "#ok#")
                     {
                         return Ok(newCats.ApiMessage);
@@ -278,7 +313,7 @@ namespace StealAllTheCats.Controllers
             
         }
 
-        private object FetchFromTheCatsApi(int NumOfcats)
+        private object FetchFromTheCaaSAPIAndStore(int NumOfcats)
         {
             dynamic Result = new ExpandoObject();
             List<Cat> LCats = new List<Cat>();
@@ -316,16 +351,18 @@ namespace StealAllTheCats.Controllers
                             //Note:
                             //Scenario 1. we have tags that are totally new and must be store to the tags table and make the connection with the cat table
                             //Scenario 2. we have tags that are stored and must be asigned without re-store them in tha table tags and we must only apply connection with the cat table
+                            List<Tag> LTags = new List<Tag>();   
+                            //foreach (string TagName in examinetags.newTags)
+                            //{
+                            //   Tag newTag = (new Tag
+                            //    {
+                            //        Name = TagName,
+                            //        Created = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()
+                            //    });
 
-                            foreach (string TagName in examinetags.newTags)
-                            {
-                                a.Tags.Add(new Tag
-                                {
-                                    Name = TagName,
-                                    Created = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()
-                                });
-                            }
-
+                            //    LTags.Add(newTag);
+                            //}
+                            //a.Tags = LTags;
                             
                         }
 
@@ -343,6 +380,39 @@ namespace StealAllTheCats.Controllers
             Result.ApiMessage = ApiMessage;
             return Result;
         }
+
+        private List<Cat> GetAllCatsFromDb()
+        {
+            var cats = _context.Cats.ToList();
+
+            
+                var cattag = _context.CatTag.ToList();
+                var tags = _context.Tags.ToList();
+
+                foreach (var thisCat in cats)
+                {
+                    var relationFound = (from p in cattag
+                                         where p.CatId == thisCat.Id
+                                         select p).ToList();
+
+                    foreach (var rel in relationFound)
+                    {
+                        var names = (from p in tags
+                                     where p.Id == rel.TagId
+                                     select p.Name).ToList();
+
+                        foreach (var text in names)
+                        {
+                            thisCat.Tags.Add(text);
+                        }
+                    }
+                
+            }
+
+            return cats;
+        }
+
+
 
         private  List<Cat> ClearDuplicateCats(List<Cat> NewFechedCats)
         {
@@ -479,6 +549,25 @@ namespace StealAllTheCats.Controllers
                 return string.Empty;
           
             }
+        }
+
+        private List<Cat> PaginationRules(List<Cat> myList, int page, int pageSize)
+        {
+            int SkipRecs = 0;
+            if (myList.Count < pageSize)
+            {
+                return myList;
+            }
+            else
+            {
+                if (page > 1)
+                {
+                    SkipRecs = (page * pageSize) - pageSize;
+                }
+                
+            }
+            
+            return myList.Skip(SkipRecs).Take(pageSize).ToList();
         }
 
     }

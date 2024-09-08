@@ -21,7 +21,8 @@ namespace StealAllTheCats.Entities
 
         //[DataType(DataType.DateTime)]
         public string Created { get; set; }
-
-        public List<Tag> Tags { get; set; } = [];
+        [NotMapped]
+        public List<string> Tags { get; set; } = [];
+        //public virtual Tag Tags { get; set; }
     }
 }

@@ -13,6 +13,10 @@ namespace StealAllTheCats.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<CatTag>()
+                .HasKey(catTag => new { catTag.CatId, catTag.TagId });
             //modelBuilder.Entity<Cat>()
             //    .HasMany(e => e.Tags)
             //    .WithMany(e => e.Cats);
@@ -36,7 +40,7 @@ namespace StealAllTheCats.Data
         public DbSet<Cat> Cats { get; set; }
         public DbSet<Tag> Tags { get; set; }
 
-        //public DbSet<CatTag> CatTag { get; set; }
+        public DbSet<CatTag> CatTag { get; set; }
 
     }
 }

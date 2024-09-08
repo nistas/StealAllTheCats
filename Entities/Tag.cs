@@ -14,6 +14,6 @@ namespace StealAllTheCats.Entities
 
         //[DataType(DataType.DateTime)]
         public string Created { get; set; }
-        public List<Cat> Cats { get; set; } = [];
+        //public List<Cat> Cats { get; set; } = [];
     }
 }
