@@ -1,0 +1,10 @@
+@StealAllTheCats_HostAddress = https://localhost:7151
+
+GET {{StealAllTheCats_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+GET {{StealAllTheCats_HostAddress}}/api/cats
+
+###
