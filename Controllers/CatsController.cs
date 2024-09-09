@@ -43,6 +43,9 @@ namespace StealAllTheCats.Controllers
         {
             _context = context;
         }
+
+     
+
         [HttpGet]
         public async Task<ActionResult<List<Cat>>> GetAllCats()
         {
@@ -69,12 +72,16 @@ namespace StealAllTheCats.Controllers
         }
 
         [HttpGet("{id:int}")]
-        public async Task<ActionResult<List<Cat>>> GetSpecificCat([FromRoute]int id)
+        public async Task<IActionResult> GetSpecificCat([FromRoute]int id)
         {
+            if (id <= 0)
+            {
+                return Ok("The Id should be > 0");
+            }
             var thisCat = await _context.Cats.FindAsync(id);
             if (thisCat is null)
             {
-                return NotFound("Cat with Id:" + id + " not found. Make sure that there are stored Cats in the Database first, and then try another Id."); // status 404
+                return Ok("Cat with Id:" + id + " not found. Make sure that there are stored Cats in the Database first, and then try another Id."); // status 404
             }
             else {
                 var cattag = _context.CatTag.ToList();
@@ -103,7 +110,7 @@ namespace StealAllTheCats.Controllers
         [HttpGet]
         //[Route("{page:int}/{pageSize:int}")]
         [Route("page={page:int}&pageSize={pageSize:int}")] // because the assigment asking this style
-        public async Task<ActionResult<List<Cat>>> GetCats([FromRoute] int page, [FromRoute] int pageSize)
+        public async Task<ActionResult<List<Cat>>> GetCatsPaging([FromRoute] int page, [FromRoute] int pageSize)
         {
             if (page == 0 || pageSize== 0)
             {
@@ -123,7 +130,7 @@ namespace StealAllTheCats.Controllers
         [HttpGet]
         //[Route("{tag}/{page:int}/{pageSize:int}")]
         [Route("tag={tag}&page={page:int}&pageSize={pageSize:int}")] // because the assigment asking this style
-        public async Task<ActionResult<List<Cat>>> GetCatsOverTag([FromRoute] string tag, [FromRoute] int page, [FromRoute] int pageSize)
+        public async Task<ActionResult<List<Cat>>> GetCatsOverTagPaging([FromRoute] string tag, [FromRoute] int page, [FromRoute] int pageSize)
         {
             if (string.IsNullOrEmpty(tag) || page == 0 || pageSize == 0)
             {
