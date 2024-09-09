@@ -17,24 +17,7 @@ namespace StealAllTheCats.Data
             base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<CatTag>()
                 .HasKey(catTag => new { catTag.CatId, catTag.TagId });
-            //modelBuilder.Entity<Cat>()
-            //    .HasMany(e => e.Tags)
-            //    .WithMany(e => e.Cats);
-
-
-            //modelBuilder.Entity<Tag>()
-            //    .HasMany(e => e.Cats)
-            //    .WithMany(e => e.Tags);
-
-            //modelBuilder.Entity<Cat>()
-            //    .HasMany(e => e.Tags)
-            //    .WithMany(e => e.Cats)
-            //    .UsingEntity(
-            //        "CatTag",
-            //        l => l.HasOne(typeof(Tag)).WithMany().HasForeignKey("TagsId").HasPrincipalKey(nameof(Tag.Id)),
-            //        r => r.HasOne(typeof(Cat)).WithMany().HasForeignKey("CatsId").HasPrincipalKey(nameof(Cat.Id)),
-            //        j => j.HasKey("CatsId", "TagsId"));
-
+           
 
         }
         public DbSet<Cat> Cats { get; set; }

@@ -15,6 +15,7 @@ using StealAllTheCats.Entities;
 using System.Collections.Generic;
 using System.Data;
 using System.Dynamic;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
@@ -47,7 +48,7 @@ namespace StealAllTheCats.Controllers
         {
             var cats = GetAllCatsFromDb();
 
-            if (cats is null)
+            if (cats.Count() ==0)
             {
                 return Ok("No Cats Found in the Database. Please try to the Fetch endpoint to fill some.");
             }
@@ -59,7 +60,7 @@ namespace StealAllTheCats.Controllers
         public async Task<ActionResult<List<Tag>>> GetAllTags()
         {
             var miaou =  _context.Tags.ToList();
-            if (miaou is null)
+            if (miaou.Count() ==0)
             {
                 return Ok("No Tags Found in the Database. Please try to the Fetch new Cats and maybe some of them are available.");
             }
@@ -152,18 +153,32 @@ namespace StealAllTheCats.Controllers
                     var foundCats = (from p in _context.Cats
                                 where p.Id == catId
                                select p).ToList();
+                   
+
                     foreach (var thisCat in foundCats)
                     {
+                        var relationFound = (from p in cattag
+                                             where p.CatId == thisCat.Id
+                                             select p).ToList();
+
+                        foreach (var rel in relationFound)
+                        {
+                            var names = (from p in _context.Tags
+                                         where p.Id == rel.TagId
+                                         select p.Name).ToList();
+
+                            foreach (var text in names)
+                            {
+                                thisCat.Tags.Add(text);
+                            }
+                        }
                         finalCats.Add(thisCat);
+
                     }
-                  
+
                 }
 
-  
                 var miaou = PaginationRules(finalCats,page, pageSize);
-
-
-
 
                 if (miaou is null || miaou.Count() == 0)
                 {
@@ -186,6 +201,18 @@ namespace StealAllTheCats.Controllers
         {
             try
             {
+          
+                if (!String.IsNullOrEmpty(ApiParams.ImagesFolderPath))
+                {
+                    if (ApiParams.SaveImageOn.ToLower() == "filesystem")
+                    {
+                        if (!Directory.Exists(ApiParams.ImagesFolderPath))
+                        {
+                            return Ok("Please make sure that the folder on which the images will be saved exists. See appsettings.json 'ImagesFolderPath' property.");
+                        }
+                    }
+                }
+
                 int NumOCatsToRequest = 25;
                 dynamic newCats = FetchFromTheCaaSAPIAndStore(25);
                 if (newCats.ApiMessage.ToString().ToLower() != "#ok#")
@@ -195,11 +222,7 @@ namespace StealAllTheCats.Controllers
                 else
                 {
                     List<Cat> LCats = ClearDuplicateCats((List<Cat>)newCats.ListOfCats);
-                    if (LCats.Count > 0)
-                    {
-                        _context.Cats.AddRange(LCats); // performance to make one call
-                        await _context.SaveChangesAsync();
-                    }
+                    SaveNewCats(LCats);
 
                     string msg = string.Empty; 
 
@@ -228,35 +251,32 @@ namespace StealAllTheCats.Controllers
         {
             try
             {
+                if (!String.IsNullOrEmpty(ApiParams.ImagesFolderPath))
+                {
+                    if (ApiParams.SaveImageOn.ToLower() == "filesystem")
+                    {
+                        if (!Directory.Exists(ApiParams.ImagesFolderPath))
+                        {
+                            return Ok("Please make sure that the folder on which the images will be saved exists. See appsettings.json 'ImagesFolderPath' property.");
+                        }
+                    }
+                }
+
+               
                 if (NumOfCats <= 0)
                 {
                     return Ok("Please define the number of cats you want to fetch. Min: 1");
                 }
                 
                     dynamic newCats = FetchFromTheCaaSAPIAndStore(NumOfCats);
-                    if (newCats.ApiMessage.ToString().ToLower() != "#ok#")
-                    {
-                        return Ok(newCats.ApiMessage);
-                    }
-                    else
-                    {
-                        List<Cat> LCats = ClearDuplicateCats((List<Cat>)newCats.ListOfCats);
-                    if (LCats.Count > 0)
-                    {
-                       
-                        foreach (Cat cat in LCats)
-                        {
-                            string catimage = SaveImage(cat.CaaSCatId, cat.Image);
-                            if (!String.IsNullOrEmpty(catimage)) // in any other case i hold the CaaSApi url
-                            {
-                                cat.Image = catimage; 
-                            }
-                        }
-
-                        _context.Cats.AddRange(LCats); // performance to make one call
-                        await _context.SaveChangesAsync();
-
-                    }
+                if (newCats.ApiMessage.ToString().ToLower() != "#ok#")
+                {
+                    return Ok(newCats.ApiMessage);
+                }
+                else
+                {
+                    List<Cat> LCats = ClearDuplicateCats((List<Cat>)newCats.ListOfCats);
+                    SaveNewCats(LCats);
                     string msg = string.Empty;
 
                     if (NumOfCats != LCats.Count)
@@ -267,7 +287,7 @@ namespace StealAllTheCats.Controllers
                     return Ok("You have requested to fetch " + NumOfCats + " cats from TheCatApi. Finally " + LCats.Count + " Cat(s) stored in the Database. " + msg);
 
 
-                    }
+                }
                 
                 
             }
@@ -282,6 +302,78 @@ namespace StealAllTheCats.Controllers
             }
 
 
+        }
+
+        private int AddCat(Cat c)
+        {
+            _context.Cats.Add(c);
+            _context.SaveChanges();
+            return c.Id; // Retrieve the Id after is added  
+        }
+        private int AddTag(string TagName)
+        {
+            var existintTag = _context.Tags.Where(p => p.Name == TagName).ToList();
+            if (existintTag.Count == 0)//means does not exist in the database
+            {
+                Tag t = (new Tag
+                {
+                    Id = 0,
+                    Name = TagName,
+                    Created = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()
+                });
+
+                _context.Tags.Add(t);
+                _context.SaveChanges();
+                return t.Id; // Retrieve the Id after is added  
+            }
+            else
+            {
+                return existintTag[0].Id;
+            }
+            
+        }
+        private void AddCatTagRelation(int CatId, int TagId)
+        {
+
+            var relationExists = _context.CatTag.Where(p => p.CatId == CatId && p.TagId == TagId).ToList();
+            if (relationExists.Count == 0)//means does not exist in the database
+            {
+                CatTag ct = (new CatTag
+                {
+                    CatId = CatId,
+                    TagId = TagId
+                });
+
+                _context.CatTag.Add(ct);
+                _context.SaveChanges();
+                
+            }
+
+       
+        }
+
+        private void SaveNewCats(List<Cat> LCats)
+        {
+            if (LCats.Count > 0)
+            {
+
+                foreach (Cat cat in LCats)
+                {
+                    string catimage = SaveImage(cat.CaaSCatId, cat.Image);
+                    if (!String.IsNullOrEmpty(catimage)) // in any other case i hold the CaaSApi url
+                    {
+                        cat.Image = catimage;
+                    }
+                    int NewCatId = AddCat(cat);
+                    foreach (string text in cat.Tags)
+                    {
+                        int NewTagId = AddTag(text);
+                        AddCatTagRelation(NewCatId, NewTagId);
+                    }
+
+                }
+
+            }
         }
 
         private object GetUriDetails(int NumOfCats)
@@ -351,19 +443,16 @@ namespace StealAllTheCats.Controllers
                             //Note:
                             //Scenario 1. we have tags that are totally new and must be store to the tags table and make the connection with the cat table
                             //Scenario 2. we have tags that are stored and must be asigned without re-store them in tha table tags and we must only apply connection with the cat table
-                            List<Tag> LTags = new List<Tag>();   
-                            //foreach (string TagName in examinetags.newTags)
-                            //{
-                            //   Tag newTag = (new Tag
-                            //    {
-                            //        Name = TagName,
-                            //        Created = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()
-                            //    });
-
-                            //    LTags.Add(newTag);
-                            //}
-                            //a.Tags = LTags;
-                            
+                            List<Tag> LTags = new List<Tag>();
+                            foreach (string TagName in examinetags.newTags)
+                            {
+                                Tag newTag = (new Tag
+                                {
+                                    Name = TagName,
+                                    Created = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()
+                                });
+                                a.Tags.Add(TagName);
+                            }
                         }
 
                             LCats.Add(a);
@@ -389,24 +478,24 @@ namespace StealAllTheCats.Controllers
                 var cattag = _context.CatTag.ToList();
                 var tags = _context.Tags.ToList();
 
-                foreach (var thisCat in cats)
+            foreach (var thisCat in cats)
+            {
+                var relationFound = (from p in cattag
+                                     where p.CatId == thisCat.Id
+                                     select p).ToList();
+
+                foreach (var rel in relationFound)
                 {
-                    var relationFound = (from p in cattag
-                                         where p.CatId == thisCat.Id
-                                         select p).ToList();
+                    var names = (from p in tags
+                                 where p.Id == rel.TagId
+                                 select p.Name).ToList();
 
-                    foreach (var rel in relationFound)
+                    foreach (var text in names)
                     {
-                        var names = (from p in tags
-                                     where p.Id == rel.TagId
-                                     select p.Name).ToList();
-
-                        foreach (var text in names)
-                        {
-                            thisCat.Tags.Add(text);
-                        }
+                        thisCat.Tags.Add(text);
                     }
-                
+                }
+
             }
 
             return cats;
@@ -453,7 +542,6 @@ namespace StealAllTheCats.Controllers
             o.existingTags = existingTags;
             return o;
         }
-
 
         private string FixTagName(string name)
         {
@@ -522,13 +610,13 @@ namespace StealAllTheCats.Controllers
                         }
                         break;
                     default:
+                        //default means that the url from CaaSApi will be saved
                         break;
                 }
             }
 
             return ImageText;
         }
-
 
         private string Base64PrefixForUrl(string FileExtention)
         {
