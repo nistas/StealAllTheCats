@@ -13,5 +13,5 @@ After downloading the project ..
 	a.	If Is not Included then open the Package Manager Console and run the command: Add-Migration
 	b.	If is included run the command: Update-Database
 6.	Build and Run the project. The Swagger should be loaded on the port assigned.
-7.	For Unit Test Assign the Project "StealAllTheCats" as Reference
+7.	For Unit Test there is the project "StealAllTheCats.nUnitTests". Assign the Project "StealAllTheCats" as Reference. All add "Existing Item" appsettings.json file from StealAllTheCats project. Make sure tha the ConnectionString is valid according to your DB.
 

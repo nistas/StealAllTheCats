@@ -8,6 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="StealAllTheCats.nUnitTests\**" />
+    <Content Remove="StealAllTheCats.nUnitTests\**" />
+    <EmbeddedResource Remove="StealAllTheCats.nUnitTests\**" />
+    <None Remove="StealAllTheCats.nUnitTests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.8">
