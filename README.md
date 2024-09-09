@@ -13,7 +13,7 @@ After downloading the project ..
 5.	Make sure that the Migration Folder is Downloaded and includes the migration files.
 	a.	If Is not Included then open the Package Manager Console and run the command: Add-Migration
 	b.	If is included run the command: Update-Database
-6.	Build and Run the project. The Swagger should be loaded on the port assigned.
+6.	Build and Run the project. The Swagger should be loaded on the port assigned. Try to request everything from the api while the database is empty to see the responses.
 7.	For Unit Test there is the project "StealAllTheCats.nUnitTests". Assign the Project "StealAllTheCats" as Reference. All add "Existing Item" appsettings.json file from StealAllTheCats project. Make sure tha the ConnectionString is valid according to your DB.
 8.	For Docker donwload the Desktop App: https://www.docker.com/products/docker-desktop/ or https://docs.docker.com/desktop/install/windows-install/ (in case of Windows)
   •	  Apply appropriate configuration for Docker Server
